@@ -23,3 +23,5 @@ docker/postgres/data/
 Thumbs.db
 .vscode/
 "@ | Out-File -FilePath .gitignore -Encoding utf8
+
+Add-Content .gitignore "`nVideo/"
