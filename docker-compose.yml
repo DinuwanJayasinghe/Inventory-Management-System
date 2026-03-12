@@ -1,0 +1,123 @@
+# =============================================================
+#  Ceyntics IMS — docker-compose.yml
+#  FILE LOCATION: Inventry-Management-System/docker-compose.yml
+#
+#  Run:  docker-compose up --build
+#
+#  After startup:
+#    Frontend  → http://localhost:5173
+#    API       → http://localhost:8000/api
+#    pgAdmin4  → http://localhost:5050
+#              → login: admin@ceyntics.com / admin
+# =============================================================
+
+version: '3.9'
+
+services:
+
+  # ─────────────────────────────────────────────────────────────
+  #  PostgreSQL Database
+  # ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ims_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       inventory_db
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - ims_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inventory_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────────
+  #  pgAdmin 4  (DB browser)
+  # ─────────────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ims_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@ceyntics.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - ims_net
+
+  # ─────────────────────────────────────────────────────────────
+  #  Laravel API  (PHP-FPM)
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend/Dockerfile
+    container_name: ims_backend
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor        # keeps vendor inside container
+      - /var/www/storage       # keeps storage inside container
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ims_net
+
+  # ─────────────────────────────────────────────────────────────
+  #  Nginx  (serves backend on :8000)
+  # ─────────────────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: ims_nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./backend/public:/var/www/public:ro
+    depends_on:
+      - backend
+    networks:
+      - ims_net
+
+  # ─────────────────────────────────────────────────────────────
+  #  React Vite Frontend  (dev server on :5173)
+  # ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    container_name: ims_frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules      # keeps node_modules inside container
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - nginx
+    networks:
+      - ims_net
+
+# ─────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+
+networks:
+  ims_net:
+    driver: bridge

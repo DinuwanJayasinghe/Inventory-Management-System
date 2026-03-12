@@ -1,0 +1,25 @@
+# .gitignore file create කරන්න
+@"
+# Laravel
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/storage/logs/*.log
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*
+
+# React
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# Docker
+docker/postgres/data/
+
+# OS
+.DS_Store
+Thumbs.db
+.vscode/
+"@ | Out-File -FilePath .gitignore -Encoding utf8
